@@ -3,7 +3,7 @@
 ###############################################################################
 
 -- 0. 세션 트랜잭션 설정
-SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
+-- SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
 
 -- 0. CREATE DATABASE CASETIFYv2
 -- DROP DATABASE IF EXISTS CASETIFYv2;
@@ -14,7 +14,7 @@ SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
 -- DROP DATABASE IF EXISTS CASETIFYv2;
 
 -- set foreign_key_checks = 0
-SET foreign_key_checks = 0;
+-- SET foreign_key_checks = 0;
 
 
 -- CREATE table USER

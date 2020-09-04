@@ -2,6 +2,20 @@
 # [CASETIFYv2 초기 INSERT data schema 스크립트]
 ###############################################################################
 
+-- 0. 세션 트랜잭션 설정
+-- SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+-- 0. CREATE DATABASE CASETIFYv2
+-- DROP DATABASE IF EXISTS CASETIFYv2;
+-- CREATE DATABASE CASETIFYv2 character SET utf8mb4 collate utf8mb4_general_ci;
+-- COMMIT;
+
+-- 0. delete database
+-- DROP DATABASE IF EXISTS CASETIFYv2;
+
+-- set foreign_key_checks = 0
+-- SET foreign_key_checks = 0;
+
 
 -- INSERT INTO USER 비회원
 INSERT INTO USER (id, name, email, password, mobile_number, create_datetime, update_datetime, is_use) VALUES (1, '비회원', 'test00@test.com', '12345678', '01000000000', NOW(), NOW(), True);

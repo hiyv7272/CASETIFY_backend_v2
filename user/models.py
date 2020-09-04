@@ -14,8 +14,8 @@ class User(models.Model):
     location = models.CharField(max_length=500, null=True)
     twitter = models.CharField(max_length=100, null=True)
     profile_image_url = models.URLField(max_length=2500, null=True)
-    create_datetime = models.DateTimeField(auto_now_add=True)
-    update_datetime = models.DateTimeField(auto_now=True)
+    regist_datetime = models.DateTimeField(null=True)
+    update_datetime = models.DateTimeField(null=True)
     is_use = models.BooleanField()
 
     class Meta:

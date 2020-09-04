@@ -1,16 +1,21 @@
 from django.urls import path 
-from .views import (
-    SignUpView, 
-    SignInView, 
-    MyProfileView,
-    MyShippingInfoView,
-    KakaologinView,
-)
+from .views import KakaologinView
+from .views import UserViewSet
 
 urlpatterns = [
-    path('/signup', SignUpView.as_view()),
-    path('/signin', SignInView.as_view()),
-    path('/myprofile', MyProfileView.as_view()),
-    path('/myshippinginfo', MyShippingInfoView.as_view()),
+    path('/signup', UserViewSet.as_view({
+        'post': 'sign_up'
+    })),
+    path('/signin', UserViewSet.as_view({
+        'post': 'sign_in'
+    })),
+    path('/myprofile', UserViewSet.as_view({
+        'get': 'get_user_profile',
+        'post': 'update_user_profile',
+    })),
+    path('/myshippinginfo', UserViewSet.as_view({
+        'get': 'get_user_shippinginfo',
+        'post': 'update_user_shippinginfo',
+    })),
     path('/kakaologin', KakaologinView.as_view()),
 ]

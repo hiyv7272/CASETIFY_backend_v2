@@ -1,162 +1,97 @@
 import jwt
 import json
-import bcrypt
 import requests
 
 from django.views import View
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 from casetify_backend.settings import SECRET_KEY
-from .utils import login_decorator, ValidateData
+from .utils import login_decorator
+
+from rest_framework import viewsets, status
+from rest_framework.response import Response
 
 from .models import User
 from order.models import Orderer
+from .serializers import UserSerializer, UserUpdateSerializer
+from order.serializers import OrdererSerializer
 
 
-class SignUpView(View):
-    def post(self, request):
+class UserViewSet(viewsets.GenericViewSet):
+    def sign_up(self, request):
         with transaction.atomic():
-
-            try:
-                data = json.loads(request.body)
-                validate_data = ValidateData(data)
-
-                validated_password = validate_data.password()
-                if validated_password:
-                    return validated_password
-
-                validated_email = validate_data.email()
-                if validated_email:
-                    return validated_email
-
-                hashed_password = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt()).decode()
-                User(
-                    email=data['email'],
-                    password=hashed_password,
-                    mobile_number=data['mobile_number'],
-                    is_use=True
-                ).save()
-
-                Orderer(
-                    USER=User.objects.get(email=data['email'])
-                ).save()
-
-                return HttpResponse(status=200)
-
-            except TypeError:
-                return JsonResponse({'message': "INVALID_TYPE"}, status=400)
-            except KeyError:
-                return JsonResponse({'message': "INVALID_KEYS"}, status=400)
-
-
-class SignInView(View):
-    def post(self, request):
-        try:
             data = json.loads(request.body)
-            user = User.objects.get(email=data['email'])
+            user_serializer = UserSerializer(data=data)
+            orderer_serializer = OrdererSerializer(data=data)
+            if user_serializer.user_create_validate(data):
+                user_serializer.create(data)
+                orderer_serializer.create(data)
 
-            if bcrypt.checkpw(data['password'].encode('utf-8'), user.password.encode('utf-8')):
-                access_token = jwt.encode({'id': user.id}, SECRET_KEY, algorithm='HS256')
-                return JsonResponse({'access_token': access_token.decode('utf-8')}, status=200)
+            return Response(status=status.HTTP_200_OK)
 
-            return JsonResponse({'message': "INVALID_PASSWORD"}, status=401)
-
-        except User.DoesNotExist:
-            return JsonResponse({'message': "INVALID_USER"}, status=400)
-        except KeyError:
-            return JsonResponse({'message': "INVALID_KEYS"}, status=400)
-
-
-class MyProfileView(View):
-    @login_decorator
-    def post(self, request):
-        try:
-            data = json.loads(request.body)
-            user = User.objects.get(id=request.user.id)
-
-            user.name = data['name']
-            user.bio = data['introduction']
-            user.website_url = data.get('website')
-            user.location = data.get('location')
-            user.twitter = data.get('twitter')
-            user.profile_image_url = data.get('images')
-            user.save()
-
-            return HttpResponse(status=200)
-
-        except user.DoesNotExist:
-            return JsonResponse({"message": "INVALID_USER"}, status=400)
-        except KeyError:
-            return JsonResponse({'message': 'INVALID_KEYS'}, status=400)
+    def sign_in(self, request):
+        data = json.loads(request.body)
+        serializer = UserSerializer(data=data, fields=('email', 'password'))
+        if serializer.user_get_validate(data):
+            return Response({'access_token': serializer.get(data)})
 
     @login_decorator
-    def get(self, request):
+    def get_user_profile(self, request):
+        query_set = User.objects.all()
+        user = get_object_or_404(query_set, pk=request.user.id)
+        serializer = UserSerializer(user, fields=(
+            'id',
+            'name',
+            'mobile_number',
+            'first_name',
+            'last_name',
+            'introduction',
+            'website_url',
+            'location',
+            'twitter',
+            'profile_image_url',
+            'regist_datetime',
+            'update_datetime',
+        ))
 
-        try:
-            user = User.objects.get(id=request.user.id)
+        return Response(serializer.data)
 
-            user_profile = dict()
-            user_profile['name'] = user.name
-            user_profile['email'] = user.email
-            user_profile['mobile_number'] = user.mobile_number
-            user_profile['first_name'] = user.first_name
-            user_profile['last_name'] = user.last_name
-            user_profile['introduction'] = user.introduction
-            user_profile['website'] = user.website_url
-            user_profile['location'] = user.location
-            user_profile['twitter'] = user.twitter
-            user_profile['image'] = user.profile_image_url
-
-            return JsonResponse({'data': user_profile}, status=200)
-
-        except User.DoesNotExist:
-            return JsonResponse({'message': "INVALID_USER"}, status=400)
-        except KeyError:
-            return JsonResponse({'message': "INVALID_KEYS"}, status=400)
-
-
-class MyShippingInfoView(View):
-    @login_decorator
-    def post(self, request):
-        try:
-            data = json.loads(request.body)
-            user = User.objects.get(id=request.user.id)
-            orderer = Orderer.objects.get(USER=user)
-
-            orderer.first_name = data['first_name']
-            orderer.last_name = data['last_name']
-            orderer.address = data['address']
-            orderer.zipcode = data['zipcode']
-            orderer.mobile_number = data['mobile_number']
-            orderer.save()
-
-            return HttpResponse(status=200)
-
-        except user.DoesNotExist:
-            return JsonResponse({"message": "INVALID_USER"}, status=400)
-        except KeyError:
-            return JsonResponse({'message': 'INVALID_KEYS'}, status=400)
 
     @login_decorator
-    def get(self, request):
-        try:
-            user = User.objects.get(id=request.user.id)
-            orderer = Orderer.objects.get(USER=user)
+    def update_user_profile(self, request):
+        data = json.loads(request.body)
+        query_set = User.objects.all()
+        user = get_object_or_404(query_set, pk=request.user.id)
+        serializer = UserUpdateSerializer(user, data=data, partial=True)
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
 
-            orderer_info = dict()
-            orderer_info['first_name'] = orderer.first_name
-            orderer_info['last_name'] = orderer.last_name
-            orderer_info['address'] = orderer.address
-            orderer_info['zipcode'] = orderer.zipcode
+        return Response(status=status.HTTP_200_OK)
 
-            return JsonResponse({'data': orderer_info}, status=200)
+    @login_decorator
+    def get_user_shippinginfo(self, request):
+        query_set = Orderer.objects.all()
+        orderer = get_object_or_404(query_set, USER=request.user.id)
+        serializer = OrdererSerializer(orderer, fields=(
+            'first_name',
+            'last_name',
+            'address',
+            'zipcode',
+        ))
 
-        except user.DoesNotExist:
-            return JsonResponse({"message": "INVALID_USER"}, status=400)
-        except orderer.DoesNotExist:
-            return JsonResponse({"message": "INVALID_USER"}, status=400)
-        except KeyError:
-            return JsonResponse({'message': 'INVALID_KEYS'}, status=400)
+        return Response({'data': serializer.data})
+
+    @login_decorator
+    def update_user_shippinginfo(self, request):
+        data = json.loads(request.body)
+        query_set = Orderer.objects.all()
+        orderer = get_object_or_404(query_set, USER=request.user.id)
+        serializer = OrdererSerializer(orderer, data=data, partial=True)
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
+
+        return Response(status=status.HTTP_200_OK)
 
 
 class KakaologinView(View):
