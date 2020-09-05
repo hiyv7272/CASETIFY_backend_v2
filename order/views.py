@@ -4,12 +4,90 @@ from datetime import datetime
 from django.views import View
 from django.http import JsonResponse, HttpResponse
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 from user.utils import login_decorator
+
+from rest_framework import viewsets, status
+from rest_framework.response import Response
 
 from .models import Order, Orderer, CheckoutStatus, CheckOut, Cart
 from user.models import User
 from artwork.models import Phonecase, PhonecasePrice
+from .serializers import (
+    OrderSerializer,
+    OrdererSerializer,
+    CartSerializer,
+    CheckoutStatusSerializer,
+    CheckOutSerializer,
+)
 
+
+class CartViewSet(viewsets.GenericViewSet):
+    @login_decorator
+    def insert_cart(self, request):
+        data = json.loads(request.body)
+        data['id'] = request.user.id
+        cart_serializer = CartSerializer(data=data)
+        if cart_serializer.insert_cart_validate(data):
+            cart_serializer.create(data)
+
+        return Response(status=status.HTTP_200_OK)
+
+    @login_decorator
+    def get_cart(self, request):
+        regular_cart_query_set = Cart.objects.select_related(
+            'USER',
+            'PHONECASE',
+            'PHONECASE_PRICE'
+        ).select_related(
+            'PHONECASE__FEATURED',
+            'PHONECASE__DEVICE_MODEL',
+            'PHONECASE__PHONECASE_COLOR',
+            'PHONECASE__PHONECASE_TYPE',
+            'PHONECASE__ARTWORK'
+        ).filter(USER=request.user.id, is_custom=False, is_use=True).order_by('id')
+
+        regular_cart_serializer = CartSerializer(regular_cart_query_set, many=True, fields=(
+            'id',
+            'is_custom',
+            'custom_info',
+            'quantity',
+            'create_datetime',
+            'update_datetime',
+            'is_use',
+            'USER',
+            'PHONECASE',
+            'PHONECASE_PRICE'
+        ), label=(
+            'USER',
+            'PHONECASE',
+            'PHONECASE_PRICE',
+        ))
+        print('dir regular_cart_query_set', dir(regular_cart_query_set[0]))
+        print('regular_cart_serializer', regular_cart_serializer)
+        print('dir regular_cart_serializer', dir(regular_cart_serializer))
+        print('regular_cart_serializer.label', regular_cart_serializer.label)
+        for row in regular_cart_serializer.data:
+            print('row', row.keys())
+
+        return Response(regular_cart_serializer.data)
+
+        # custom_cart_list = list()
+        # for row in custom_cart_serializer:
+        #     dict_data = dict()
+        #     dict_data['cart_id'] = row.id
+        #     dict_data['phonecase_id'] = row.PHONECASE.id
+        #     dict_data['phonecase_name'] = row.PHONECASE.name
+        #     dict_data['phonecase_device_name'] = row.PHONECASE.DEVICE_MODEL.name
+        #     dict_data['phonecase_color_name'] = row.PHONECASE.PHONECASE_COLOR.name
+        #     dict_data['phonecase_type'] = row.PHONECASE.PHONECASE_TYPE.name
+        #     dict_data['phonecase_price'] = row.PHONECASE_PRICE.price
+        #     dict_data['phonecase_artwork_name'] = row.PHONECASE.ARTWORK.name
+        #     dict_data['is_custom'] = row.is_custom
+        #     dict_data['custom_info'] = row.custom_info
+        #     dict_data['quantity'] = row.quantity
+        #
+        #     custom_cart_list.append(dict_data)
 
 class CartView(View):
     @login_decorator
@@ -133,7 +211,8 @@ class CheckoutView(View):
                     if cart:
                         cart.is_use = False
                         cart.save()
-                        sub_total_price += float(Cart.objects.select_related('PHONECASE_PRICE').get(id=cart_id).PHONECASE_PRICE.price)
+                        sub_total_price += float(
+                            Cart.objects.select_related('PHONECASE_PRICE').get(id=cart_id).PHONECASE_PRICE.price)
 
                 if sub_total_price > 49.00:
                     delivery_price = float("00.00")
